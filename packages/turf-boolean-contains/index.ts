@@ -1,0 +1,338 @@
+import {
+  BBox,
+  Feature,
+  Geometry,
+  LineString,
+  MultiPoint,
+  MultiPolygon,
+  Point,
+  Polygon,
+} from "geojson";
+import { bbox as calcBbox } from "@turf/bbox";
+import { booleanPointInPolygon } from "@turf/boolean-point-in-polygon";
+import { booleanPointOnLine as isPointOnLine } from "@turf/boolean-point-on-line";
+import { getGeom } from "@turf/invariant";
+import { feature, featureCollection, lineString } from "@turf/helpers";
+import { lineSplit } from "@turf/line-split";
+
+/**
+ * Tests whether geometry a contains geometry b.
+ * The interiors of both geometries must intersect, and the interior and boundary of geometry b must not intersect the exterior of geometry a.
+ * booleanContains(a, b) is equivalent to booleanWithin(b, a)
+ *
+ * @function
+ * @param {Geometry|Feature<any>} feature1 GeoJSON Feature or Geometry
+ * @param {Geometry|Feature<any>} feature2 GeoJSON Feature or Geometry
+ * @returns {boolean} true/false
+ * @example
+ * var line = turf.lineString([[1, 1], [1, 2], [1, 3], [1, 4]]);
+ * var point = turf.point([1, 2]);
+ *
+ * turf.booleanContains(line, point);
+ * //=true
+ */
+function booleanContains(
+  feature1: Feature<any> | Geometry,
+  feature2: Feature<any> | Geometry
+) {
+  const geom1 = getGeom(feature1);
+  const geom2 = getGeom(feature2);
+  const type1 = geom1.type;
+  const type2 = geom2.type;
+  const coords1 = geom1.coordinates;
+  const coords2 = geom2.coordinates;
+
+  switch (type1) {
+    case "Point":
+      switch (type2) {
+        case "Point":
+          return compareCoords(coords1, coords2);
+        default:
+          throw new Error("feature2 " + type2 + " geometry not supported");
+      }
+    case "MultiPoint":
+      switch (type2) {
+        case "Point":
+          return isPointInMultiPoint(geom1, geom2);
+        case "MultiPoint":
+          return isMultiPointInMultiPoint(geom1, geom2);
+        default:
+          throw new Error("feature2 " + type2 + " geometry not supported");
+      }
+    case "LineString":
+      switch (type2) {
+        case "Point":
+          return isPointOnLine(geom2, geom1, { ignoreEndVertices: true });
+        case "LineString":
+          return isLineOnLine(geom1, geom2);
+        case "MultiPoint":
+          return isMultiPointOnLine(geom1, geom2);
+        default:
+          throw new Error("feature2 " + type2 + " geometry not supported");
+      }
+    case "Polygon":
+      switch (type2) {
+        case "Point":
+          return booleanPointInPolygon(geom2, geom1, { ignoreBoundary: true });
+        case "LineString":
+          return isLineInPoly(geom1, geom2);
+        case "Polygon":
+          return isPolyInPoly(geom1, geom2);
+        case "MultiPoint":
+          return isMultiPointInPoly(geom1, geom2);
+        case "MultiPolygon":
+          return isMultiPolyInPoly(geom1, geom2);
+        default:
+          throw new Error("feature2 " + type2 + " geometry not supported");
+      }
+    case "MultiPolygon":
+      switch (type2) {
+        case "Polygon":
+          return isPolygonInMultiPolygon(geom1, geom2);
+        default:
+          throw new Error("feature2 " + type2 + " geometry not supported");
+      }
+    default:
+      throw new Error("feature1 " + type1 + " geometry not supported");
+  }
+}
+
+function isPolygonInMultiPolygon(multiPolygon: MultiPolygon, polygon: Polygon) {
+  return multiPolygon.coordinates.some((coords) =>
+    isPolyInPoly({ type: "Polygon", coordinates: coords }, polygon)
+  );
+}
+
+function isMultiPolyInPoly(polygon: Polygon, multiPolygon: MultiPolygon) {
+  return multiPolygon.coordinates.every((coords) =>
+    isPolyInPoly(polygon, { type: "Polygon", coordinates: coords })
+  );
+}
+
+function isPointInMultiPoint(multiPoint: MultiPoint, pt: Point) {
+  let i;
+  let output = false;
+  for (i = 0; i < multiPoint.coordinates.length; i++) {
+    if (compareCoords(multiPoint.coordinates[i], pt.coordinates)) {
+      output = true;
+      break;
+    }
+  }
+  return output;
+}
+
+function isMultiPointInMultiPoint(
+  multiPoint1: MultiPoint,
+  multiPoint2: MultiPoint
+) {
+  for (const coord2 of multiPoint2.coordinates) {
+    let matchFound = false;
+    for (const coord1 of multiPoint1.coordinates) {
+      if (compareCoords(coord2, coord1)) {
+        matchFound = true;
+        break;
+      }
+    }
+    if (!matchFound) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isMultiPointOnLine(lineString: LineString, multiPoint: MultiPoint) {
+  let haveFoundInteriorPoint = false;
+  for (const coord of multiPoint.coordinates) {
+    if (isPointOnLine(coord, lineString, { ignoreEndVertices: true })) {
+      haveFoundInteriorPoint = true;
+    }
+    if (!isPointOnLine(coord, lineString)) {
+      return false;
+    }
+  }
+  if (haveFoundInteriorPoint) {
+    return true;
+  }
+  return false;
+}
+
+function isMultiPointInPoly(polygon: Polygon, multiPoint: MultiPoint) {
+  for (const coord of multiPoint.coordinates) {
+    if (!booleanPointInPolygon(coord, polygon, { ignoreBoundary: true })) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isLineOnLine(lineString1: LineString, lineString2: LineString) {
+  let haveFoundInteriorPoint = false;
+  for (const coords of lineString2.coordinates) {
+    if (
+      isPointOnLine({ type: "Point", coordinates: coords }, lineString1, {
+        ignoreEndVertices: true,
+      })
+    ) {
+      haveFoundInteriorPoint = true;
+    }
+    if (
+      !isPointOnLine({ type: "Point", coordinates: coords }, lineString1, {
+        ignoreEndVertices: false,
+      })
+    ) {
+      return false;
+    }
+  }
+  return haveFoundInteriorPoint;
+}
+
+function splitLineIntoSegmentsOnPolygon(
+  linestring: LineString,
+  polygon: Polygon
+) {
+  const coords = linestring.coordinates;
+
+  const outputSegments: Feature<LineString>[] = [];
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const seg = lineString([coords[i], coords[i + 1]]);
+    const split = lineSplit(seg, feature(polygon));
+
+    if (split.features.length === 0) {
+      outputSegments.push(seg);
+    } else {
+      outputSegments.push(...split.features);
+    }
+  }
+
+  return featureCollection(outputSegments);
+}
+
+function isLineInPoly(polygon: Polygon, linestring: LineString) {
+  const polyBbox = calcBbox(polygon);
+  const lineBbox = calcBbox(linestring);
+
+  if (!doBBoxOverlap(polyBbox, lineBbox)) {
+    return false;
+  }
+
+  for (const coord of linestring.coordinates) {
+    if (!booleanPointInPolygon(coord, polygon)) {
+      return false;
+    }
+  }
+
+  let isContainedByPolygonBoundary = false;
+  // split intersecting segments and verify their inclusion
+  const lineSegments = splitLineIntoSegmentsOnPolygon(linestring, polygon);
+
+  for (const lineSegment of lineSegments.features) {
+    const midpoint = getMidpoint(
+      lineSegment.geometry.coordinates[0],
+      lineSegment.geometry.coordinates[1]
+    );
+
+    // make sure all segments do not intersect with polygon exterior
+    if (!booleanPointInPolygon(midpoint, polygon)) {
+      return false;
+    }
+
+    // make sure at least 1 segment intersects with the polygon's interior
+    if (
+      !isContainedByPolygonBoundary &&
+      booleanPointInPolygon(midpoint, polygon, { ignoreBoundary: true })
+    ) {
+      isContainedByPolygonBoundary = true;
+    }
+  }
+
+  return isContainedByPolygonBoundary;
+}
+
+/**
+ * Is Polygon2 in Polygon1
+ * Only takes into account outer rings
+ *
+ * @private
+ * @param {Geometry|Feature<Polygon>} feature1 Polygon1
+ * @param {Geometry|Feature<Polygon>} feature2 Polygon2
+ * @returns {boolean} true/false
+ */
+function isPolyInPoly(
+  feature1: Feature<Polygon> | Polygon,
+  feature2: Feature<Polygon> | Polygon
+) {
+  // Handle Nulls
+  if (feature1.type === "Feature" && feature1.geometry === null) {
+    return false;
+  }
+  if (feature2.type === "Feature" && feature2.geometry === null) {
+    return false;
+  }
+
+  const poly1Bbox = calcBbox(feature1);
+  const poly2Bbox = calcBbox(feature2);
+  if (!doBBoxOverlap(poly1Bbox, poly2Bbox)) {
+    return false;
+  }
+
+  const coords = getGeom(feature2).coordinates;
+  for (const ring of coords) {
+    for (const coord of ring) {
+      if (!booleanPointInPolygon(coord, feature1)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function doBBoxOverlap(bbox1: BBox, bbox2: BBox) {
+  if (bbox1[0] > bbox2[0]) {
+    return false;
+  }
+  if (bbox1[2] < bbox2[2]) {
+    return false;
+  }
+  if (bbox1[1] > bbox2[1]) {
+    return false;
+  }
+  if (bbox1[3] < bbox2[3]) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * compareCoords
+ *
+ * @private
+ * @param {Position} pair1 point [x,y]
+ * @param {Position} pair2 point [x,y]
+ * @returns {boolean} true/false if coord pairs match
+ */
+function compareCoords(pair1: number[], pair2: number[]) {
+  return pair1[0] === pair2[0] && pair1[1] === pair2[1];
+}
+
+function getMidpoint(pair1: number[], pair2: number[]) {
+  return [(pair1[0] + pair2[0]) / 2, (pair1[1] + pair2[1]) / 2];
+}
+
+export {
+  booleanContains,
+  isPolygonInMultiPolygon,
+  isPointInMultiPoint,
+  isMultiPointInMultiPoint,
+  isMultiPointOnLine,
+  isMultiPointInPoly,
+  isLineOnLine,
+  isLineInPoly,
+  isPolyInPoly,
+  isMultiPolyInPoly,
+  doBBoxOverlap,
+  compareCoords,
+  getMidpoint,
+};
+
+export default booleanContains;

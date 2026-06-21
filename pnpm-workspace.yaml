@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+onlyBuiltDependencies:
+  - esbuild
+  - nx
+patchedDependencies:
+  clipper2-ts: patches/clipper2-ts.patch

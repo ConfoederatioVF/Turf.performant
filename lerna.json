@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/lerna/schemas/lerna-schema.json",
+  "npmClient": "pnpm",
+  "version": "7.3.1",
+  "command": {
+    "publish": {
+      "registry": "https://registry.npmjs.org"
+    }
+  }
+}

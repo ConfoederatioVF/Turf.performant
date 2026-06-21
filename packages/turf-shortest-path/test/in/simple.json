@@ -1,0 +1,50 @@
+{
+  "type": "FeatureCollection",
+  "properties": {
+    "resolution": 10,
+    "units": "kilometers"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "start"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [5.625, 40.763]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "type": "end"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [11.931, 39.147]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [8.206787, 40.730608],
+            [8.569335, 39.892879],
+            [8.349609, 39.257778],
+            [8.843994, 38.908132],
+            [9.085693, 39.257778],
+            [9.591064, 39.164141],
+            [9.591064, 40.271143],
+            [9.821777, 40.472024],
+            [9.283447, 41.253032],
+            [8.206787, 40.730608]
+          ]
+        ]
+      }
+    }
+  ]
+}
