@@ -13,7 +13,7 @@ A fork of [**Turf.js**](https://github.com/turfjs/turf) maintained by Confoedera
 
 ## Abstract
 
-This fork is a CDN drop-in replacement for Turf.js, based off the [clipper2-ts pull request](https://github.com/Turfjs/turf/pull/2997) by smallsauceepan, with drastic performance improvements to elementary operations such as difference, intersect, and union. In our own testing, we found improvements for complex layer operations of ~6-10x over real academic datasets.
+This fork is a CDN drop-in replacement for Turf.js, based off the [clipper2-ts pull request](https://github.com/Turfjs/turf/pull/2997) by smallsaucepan, with drastic performance improvements to elementary operations such as difference, intersect, and union. In our own testing, we found improvements for complex layer operations of ~6-10x over real academic datasets.
 
 Unfortunately, this draft has not yet been merged into the main repository due to a slight increase in build size and architectural concerns. We have bypassed those to build the `.min.js` ourselves.
 
