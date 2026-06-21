@@ -9,7 +9,7 @@
 
 [![Join our community!](https://img.shields.io/discord/548994743925997570?label=Discord&style=for-the-badge)](https://discord.gg/89kQY2KFQz) ![](https://img.shields.io/github/languages/code-size/ConfoederatioVF/Turf.performant?style=for-the-badge) 
 
-A fork of [**Turf.js**](https://github.com/turfjs/turf) maintained by Confoederatio, Technical Division (CTD).
+A fork of [**Turf.js**](https://github.com/turfjs/turf) maintained by Confoederatio, Technical Division (CTD). Used by [Naissance GIS](https://github.com/ConfoederatioVF/Naissance).
 
 ## Abstract
 
